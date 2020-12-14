@@ -1,5 +1,5 @@
 require("dotenv").config();
-const { Reshuffle } = require("reshuffle");
+const { Reshuffle, CronConnector } = require("reshuffle");
 const { GitHubConnector } = require("reshuffle-github-connector");
 const {
   SlackConnector,
@@ -9,6 +9,8 @@ const {
 
 (async () => {
   const app = new Reshuffle();
+  // Cron config
+  const cronConnector = new CronConnector(app);
   //Github Config
   const github = new GitHubConnector(app, {
     token: process.env.GITHUB_TOKEN,
@@ -19,7 +21,7 @@ const {
     signingSecret: process.env.SLACK_SIGN_SECRET,
     port: 3000,
   });
-  // const channel = "C01HCT0AK5W";
+  const channel = "C01HCT0AK5W";
 
   const slackUsers = await (async () => {
     const webClient = await slackConnector.getWebClient();
@@ -30,6 +32,7 @@ const {
     });
   })();
 
+  //
   github.on(
     {
       owner: process.env.GITHUB_OWNER,
@@ -56,6 +59,22 @@ const {
       }
     }
   );
+
+  //Check open PR's with cron connector
+  cronConnector.on({ expression: "0 12 * * 4 *" }, async (event, app) => {
+    const { data } = await github.sdk().pulls.list({
+      owner: process.env.GITHUB_OWNER,
+      repo: process.env.GITHUB_REPO,
+    });
+    data.every(async ({ created_at, html_url }) => {
+      await slackConnector.postMessage(
+        channel,
+        `** Reminder ** Open pull requests from ${new Date(
+          created_at
+        )} - ${html_url}`
+      );
+    });
+  });
 
   app.start(8000);
 })().catch(console.error);
