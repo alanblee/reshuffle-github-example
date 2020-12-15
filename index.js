@@ -59,20 +59,27 @@ const {
       }
     }
   );
-
+  // 0 12 * * 4 *
   //Check open PR's with cron connector
-  cronConnector.on({ expression: "0 12 * * 4 *" }, async (event, app) => {
+  cronConnector.on({ expression: "1 * * * * *" }, async (event, app) => {
     const { data } = await github.sdk().pulls.list({
       owner: process.env.GITHUB_OWNER,
       repo: process.env.GITHUB_REPO,
     });
-    data.every(async ({ created_at, html_url }) => {
-      await slackConnector.postMessage(
-        channel,
-        `** Reminder ** Open pull requests from ${new Date(
-          created_at
-        )} - ${html_url}`
-      );
+
+    data.forEach(({ created_at, html_url, requested_reviewers: reviewers }) => {
+      reviewers.every(({ login }) => {
+        slackUsers.every(async ({ name, id }) => {
+          if (login === name) {
+            await slackConnector.postMessage(
+              id,
+              `** Reminder ** Open pull requests from ${new Date(
+                created_at
+              )} - ${html_url}`
+            );
+          }
+        });
+      });
     });
   });
 
