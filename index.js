@@ -12,7 +12,7 @@ const {
   // Cron config
   const cronConnector = new CronConnector(app);
   //Github Config
-  const github = new GitHubConnector(app, {
+  const githubConnector = new GitHubConnector(app, {
     token: process.env.GITHUB_TOKEN,
     runtimeBaseUrl: process.env.RUNTIME_BASE_URL,
   });
@@ -21,8 +21,9 @@ const {
     signingSecret: process.env.SLACK_SIGN_SECRET,
     port: 3000,
   });
-  const channel = "C01HCT0AK5W";
+  // const channel = "C01HCT0AK5W";
 
+  // Fetch slack user list
   const slackUsers = await (async () => {
     const webClient = await slackConnector.getWebClient();
     const { members } = await webClient.users.list();
@@ -33,7 +34,7 @@ const {
   })();
 
   //
-  github.on(
+  githubConnector.on(
     {
       owner: process.env.GITHUB_OWNER,
       repo: process.env.GITHUB_REPO,
@@ -59,10 +60,11 @@ const {
       }
     }
   );
+
   // 0 12 * * 4 *
   //Check open PR's with cron connector
   cronConnector.on({ expression: "1 * * * * *" }, async (event, app) => {
-    const { data } = await github.sdk().pulls.list({
+    const { data } = await githubConnector.sdk().pulls.list({
       owner: process.env.GITHUB_OWNER,
       repo: process.env.GITHUB_REPO,
     });
