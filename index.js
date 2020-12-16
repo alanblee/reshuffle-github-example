@@ -27,19 +27,14 @@ const {
   const slackUsers = await (async () => {
     const webClient = await slackConnector.getWebClient();
     const { members } = await webClient.users.list();
-    // let usersHash = {};
+    let usersHash = {};
 
-    // members.forEach((member) => {
-    //   if (!usersHash[member.profile.display_name]) {
-    //     usersHash[member.profile.display_name] = member.id;
-    //   }
-    // });
-    // return usersHash;
-    return members.map((member) => {
-      return { name: member.profile.display_name, id: member.id };
+    members.forEach((member) => {
+      usersHash[member.profile.display_name] = member.id;
     });
+    return usersHash;
   })();
-
+  console.log(slackUsers);
   githubConnector.on(
     {
       owner: process.env.GITHUB_OWNER, // github repo owner
@@ -54,21 +49,23 @@ const {
           }
         );
         // Fetch github requested reviewer list
-        if (reviewers.length <= 0) {
+        if (reviewers.length == 0) {
           await slackConnector.postMessage(
             "general",
             `New pull request - ${event.pull_request.html_url}`
           );
+        } else {
+          reviewers.forEach(async (login) => {
+            if (slackUsers.hasOwnProperty(login)) {
+              await slackConnector.postMessage(
+                slackUsers[login],
+                `*** New pull request *** - Please review - ${new Date(
+                  event.pull_request.created_at
+                )} - ${event.pull_request.html_url}`
+              );
+            }
+          });
         }
-        // Iterates over slack user list and DMs the matching users
-        slackUsers.every(async ({ name, id }) => {
-          if (reviewers.includes(name)) {
-            await slackConnector.postMessage(
-              id,
-              `Please review this pull request - ${event.pull_request.html_url}`
-            );
-          }
-        });
       }
     }
   );
@@ -83,23 +80,21 @@ const {
 
     data.forEach(
       async ({ created_at, html_url, requested_reviewers: reviewers }) => {
-        if (reviewers.length <= 0) {
+        if (reviewers.length == 0) {
           await slackConnector.postMessage(
             "general",
             `Pending pull request - ${html_url}`
           );
         } else {
-          reviewers.forEach(({ login }) => {
-            slackUsers.forEach(async ({ name, id }) => {
-              if (login === name) {
-                await slackConnector.postMessage(
-                  id,
-                  `** Pending review ** pull requests from ${new Date(
-                    created_at
-                  )} - ${html_url}`
-                );
-              }
-            });
+          reviewers.forEach(async ({ login }) => {
+            if (slackUsers.hasOwnProperty(login)) {
+              await slackConnector.postMessage(
+                slackUsers[login],
+                `** Pending review ** pull requests from ${new Date(
+                  created_at
+                )} - ${html_url}`
+              );
+            }
           });
         }
       }
